@@ -31,6 +31,7 @@ function* makeLine() {
   const lineLength = 300;
   const maxPenDepth = -5;
   const numLines = 10;
+  const lineSpacing = 2;
   let lineCnt = 0;
 
   while(lineCnt < numLines) {
@@ -43,7 +44,7 @@ function* makeLine() {
       line.push(lineTo(i + startX, startY, maxPenDepth - (maxPenDepth / lineLength * i)));
     }
     line.push(penUp());
-    startY += 5;
+    startY += lineSpacing;
     line.push(moveTo(startX, startY, 5000));
     yield line.join('\n');
     lineCnt++;
