@@ -3,7 +3,7 @@ const SerialPort = require('serialport');
 const EventEmitter = require('events');
 
 const Readline = SerialPort.parsers.Readline;
-const port = new SerialPort('/dev/tty.usbserial-FTELMX61', {
+const port = new SerialPort('/dev/ttyS0', {
   baudRate: 115200,
 });
 
@@ -65,7 +65,14 @@ const commands = {
     if (cmd.charAt(cmd.length -1) !== '\n') {
       cmd += '\n';
     }
-    this.queue.unshift(cmd);
+    //detect multi-line package and split into discreet lines
+    //this.queue.unshift(cmd);
+    const commands = cmd.split('\n');
+    const delineatedCommands = commands.map((e) => {
+	    return e + '\n';
+    });
+    console.log(delineatedCommands); 
+    this.queue = [...delineatedCommands, ...this.queue];
     //if streaming has stopped (or will stop after next response (a rare case??))
     //kick things off again with a newline
     //TODO: but only send once!

@@ -1,5 +1,5 @@
 const stream = require('./grblStream');
-const drawLine = require('./../../sketches/penDepthTest');
+const drawLine = require('./../sketches/penDepthTest');
 
 const draw = drawLine();
 
