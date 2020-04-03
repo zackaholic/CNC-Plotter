@@ -18,41 +18,40 @@ function lineTo(x, y, stroke, feed) {
 
 function moveTo(x, y, feed) {
   return (
-    feed === undefined 
+    feed === undefined
     ? `G0X${trim(x)}Y${trim(y)}`
     : `G1X${trim(x)}Y${trim(y)}F${feed}`
   );
 }
 
-
 function* makeLine() {
   let startX = 10;
   let startY = 0;
   const lineLength = 300;
-  const maxPenDepth = -5;
-  const numLines = 10;
+  const maxPenDepth = -3;
+  const numLines = 100;
   const lineSpacing = 2;
   let lineCnt = 0;
+  const feed = 7000;
 
-  while(lineCnt < numLines) {
+  while(lineCnt < 1) {
     const line = [];
-    line.push(moveTo(startX, startY, 5000));
-    for (let i = 0; i < lineLength / 2; i++) {
-      line.push(lineTo(i + startX, startY, maxPenDepth / lineLength * i));
+    for (let i = 0; i < numLines; i++) {
+	    line.push(lineTo(startX + lineLength / 2, startY, maxPenDepth, feed));
+	    line.push(lineTo(startX + lineLength, startY, 0));
+	    line.push(penUp());
+	    startY += lineSpacing;
+	    line.push(moveTo(startX, startY, feed));
     }
-    for (let i = lineLength / 2; i < lineLength; i++) {
-      line.push(lineTo(i + startX, startY, maxPenDepth - (maxPenDepth / lineLength * i)));
-    }
-    line.push(penUp());
-    startY += lineSpacing;
-    line.push(moveTo(startX, startY, 5000));
-    yield line.join('\n');
+    line.push(moveTo(0, 0, feed));
     lineCnt++;
+    yield line.join('\n');
   }
 }
 
-// const lineMaker = makeLine();
-// const { value, done } = lineMaker.next();
+ const lineMaker = makeLine();
+ const { value, done } = lineMaker.next();
 // console.log(done);
+ console.log(value);
 // console.log(value);
-module.exports = makeLine;
+//module.exports = makeLine;

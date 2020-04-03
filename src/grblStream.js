@@ -12,7 +12,7 @@ const parser = port.pipe(new Readline('\n'));
 
 class Emitter extends EventEmitter {};
 const streamer = new Emitter();
-let lowBufferThreshold = 10;
+let lowBufferThreshold = 1;
 
 const watcher = (emitter) => {
   return (buff, threshold) => {
@@ -39,9 +39,9 @@ const parseGrbl = (res) => {
   res = res.toString('utf8');
   if (res.includes('ok')) {
     grbl.use();
-    fillGrblBuffer();    
+    fillGrblBuffer();
   }else if (res.includes('Grbl')) {
-   streamer.emit('first-contact'); 
+   streamer.emit('first-contact');
   }else if (res.includes('error')) {
       //switch error code?
   }
@@ -67,12 +67,14 @@ const commands = {
     }
     //detect multi-line package and split into discreet lines
     //this.queue.unshift(cmd);
-    const commands = cmd.split('\n');
-    const delineatedCommands = commands.map((e) => {
-	    return e + '\n';
-    });
-    console.log(delineatedCommands); 
-    this.queue = [...delineatedCommands, ...this.queue];
+    const commands = cmd.split('\n')
+	  .map(e => e + '\n')
+	  .reverse();
+    //const delineatedCommands = commands.map((e) => {
+//	    return e + '\n';
+ //   });
+    this.queue = [...commands, ...this.queue];
+    //console.log('\n Command queue: \n' + this.queue + '\n End command queue \n');
     //if streaming has stopped (or will stop after next response (a rare case??))
     //kick things off again with a newline
     //TODO: but only send once!
@@ -83,7 +85,8 @@ const commands = {
   },
   consume: function() {
     const consumed = this.queue.pop();
-    //console.log('Buffer size: ', this.queue.length);
+//    console.log('Buffer size: ', this.queue.length);
+//    console.log('Buffer: ' + this.queue + '\n\n');
     watchBuffer(this.queue, lowBufferThreshold);
     return consumed;
   }
@@ -96,18 +99,18 @@ const grbl = {
   streaming: false,
 
   add: function (cmd) {
-//    console.log(`added: ${cmd} (${cmd.length})`);
+ //   console.log(`added: ${cmd} (${cmd.length})`);
     this.free -= cmd.length;
-//    console.log('grbl free: ', this.free);    
+ //   console.log('grbl free: ', this.free);
     this.queued.push(cmd);
   },
   use: function () {
-    //console.log(`use called and grbl queue has ${this.queued.length} elements`);
+ //   console.log(`use called and grbl queue has ${this.queued.length} elements`);
 
-    if (this.queued.length) {  
-//      console.log(`removed: ${this.queued[0]} (${this.queued[0].length})`);        
+    if (this.queued.length) {
+ //     console.log(`removed: ${this.queued[0]} (${this.queued[0].length})`);
       this.free += this.queued.shift().length;
-//      console.log('free: ', this.free);    
+ //     console.log('free: ', this.free);
       if (this.free === this.len) {
         //last command in queue has been parsed!
         streamer.emit('grbl-empty');
