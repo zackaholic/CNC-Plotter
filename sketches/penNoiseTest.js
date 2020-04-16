@@ -33,31 +33,29 @@ function setFeed(feed) {
   return `F${feed}`;
 }
 
-const simplex = new SimplexNoise(0.02, 50, 1);
 
 function* makeLine() {
   let startX = 0;
   let startY = 0;
   const lineLength = 300;
   const center = lineLength / 2;
-  const maxPenDepth = -3.5;
-  const numLines = 100;
+  const maxPenDepth = -2.8;
+  const penTouchDepth = -1;
+  const numLines = 1;
   const lineSpacing = 2;
   let lineCnt = 0;
-  const feed = 7000;
+  const feed = 3000;
+
+const simplex = new SimplexNoise(0.1, Math.abs(maxPenDepth - penTouchDepth), 1);
 
   while(lineCnt < 1) {
     const line = [];
-    setFeed(feed);
-    for (let i = 0; i < numLines; i++) {
-      const centerOffset = simplex.noise();
-	    line.push(lineTo(center + centerOffset, startY, maxPenDepth));
-	    line.push(lineTo(lineLength, startY, 0));
-	    line.push(penUp());
-	    startY += lineSpacing;
-	    line.push(moveTo(startX, startY, feed));
+    line.push(setFeed(feed));
+    for (let i = 0; i < lineLength; i++) {
+	    line.push(lineTo(i, startY, penTouchDepth + simplex.noise()));
     }
-    line.push(moveTo(0, 0, feed));
+    line.push(penUp());
+    line.push(moveTo(0, 0, 8000));
     lineCnt++;
     yield line.join('\n');
   }

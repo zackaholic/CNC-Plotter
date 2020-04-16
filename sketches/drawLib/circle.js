@@ -1,6 +1,5 @@
-import Point from './point.js';
-import Spline from './spline.js';
-import { Vec2d } from './toxic.js';
+const Spline = require('./spline.js');
+const { Vec2d } = require('./toxic.js');
 
 const circlePoints = (center, radius, resolution) => {
   const circumference = radius * 2 * Math.PI;
@@ -9,9 +8,13 @@ const circlePoints = (center, radius, resolution) => {
   const points = [];
 
   for (let i = 0; i < numPoints; i++) {
-    points[i] = new vec2d(radius * Math.cos(i * unitAngle) + center.x,
+    points[i] = new Vec2d(radius * Math.cos(i * unitAngle) + center.x,
                         radius * Math.sin(i * unitAngle) + center.y)
   }
+  //repeat first point as last point to draw a closed circle when rendering..
+  //good idea? bad idea?
+  //should circle have it's own gcode rendering method?
+  points.push(points[0]);
   return points;
 }
 
@@ -56,7 +59,7 @@ Circle.prototype.mutateNoise = function(mutateArray, scale) {
   });
 }
 
-export default Circle;
+module.exports = Circle;
 
 
 
