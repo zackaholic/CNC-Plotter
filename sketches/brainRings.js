@@ -43,21 +43,89 @@ function averageArrays(a, b) {
   });
 }
 
+function addArrays(a, b) {
+  return a.map((e, i) => e + b[i]);
+}
+
+function subArrays(a, b) {
+  return a.map((e, i) => e - b[i]);
+}
+
+function scaleArray(a, scaleFactor) {
+  return a.map(e => e * scaleFactor);
+}
+
+function smoothAbberations(arr, deviation) {
+  const average = arr.reduce((acc, e) => {return acc + e}, 0) / arr.length;
+  const max = Math.max(...arr);
+  return arr.map((e, i, a) => {
+    //replace very large or small elements with value of their neighbors or average
+    //if it's the first value
+    return (e < average * deviation && e > average - average * deviation)
+      ? e
+      : i === 0 ? average : a[i - 1];
+  });
+}
+
+function midValue(arr) {
+  return (Math.max(...arr) - Math.min(...arr)) / 2 + Math.min(...arr);
+}
+
+function centerOnZero(arr) {
+  const midVal = midValue(arr);
+  return arr.map(e => e - midVal);
+}
+
+function interfereArrays(a, b) {
+  aNormal = centerOnZero(a);
+  bNormal = centerOnZero(b);
+  const interfered = addArrays(aNormal, bNormal);
+  const newMin = Math.min(...interfered);
+  return interfered.map(e => e + Math.abs(newMin));
+}
+
 function aggregateData(lowAlpha, highAlpha, lowBeta, highBeta) {
   const alpha = averageArrays(lowAlpha, highAlpha);
   const beta = averageArrays(lowBeta, highBeta);
-
-  //now do something
+  const cleanedAlpha = smoothAbberations(alpha, 2.5);
+  const cleanedBeta = smoothAbberations(beta, 2.5);
+  //return averageArrays(cleanedAlpha, cleanedBeta);
+  return interfereArrays(cleanedBeta, cleanedAlpha);
 }
 
-const data = brainReading(process.argv[2], {dataPoints: 278});
+function pumpCheck(dutyCycle, numMoves) {
+  //this will not work if all line lengths are < frequency number of moves long
+  //in that case have to use a stepper motor?
+  //or might not work at all in such cases due to mechanical limitations of pump
+
+  //const frequency = 20; // rate in units of number of drawing moves to pulse at; this is also max resolution
+  //or calculate frequency based on number of total segments?
+  const frequency = numMoves / 20;  // 36mm circle has about 220 segments at 0.5mm intervals
+  const segmentsOn = Math.floor(frequency * dutyCycle);
+  const segmentsOff = Math.floor(frequency - segmentsOn);
+  return (index) => {
+    return  index % Math.floor(frequency) <= segmentsOn;
+  }
+}
+
+const G1 = (x, y, z, f) => `G1X${trim(x)}Y${trim(y)}Z${trim(z)}${f === undefined ? '' : `F${trim(f)}`}`;
+const G0 = (x, y, z) => `G0X${x}Y${y}Z${z}`;
+const setFeed = (f) => `F${f}`;
+const setFlow = (f) => `S${f}`;
+const clearPen = () => 'G0Z0';
+const laserMode = () => 'M4'; //Dynamic Laser Power Mode
+
+const data = brainReading(process.argv[2]);
+const attention = data['attention'];
+const meditation = data['meditation'];
 const lowAlpha = data['low alpha'];
 const highAlpha = data['high alpha'];
 const lowBeta = data['low beta'];
 const highBeta = data['high beta'];
-aggregateData(lowAlpha, highAlpha, lowBeta, highBeta);
+const aggregated = aggregateData(lowAlpha, highAlpha, lowBeta, highBeta);
+const pumpRate = 1000;
+const footerGcode = () => console.log([setFlow(0), clearPen(), G1(0, 0, 0)].join('\n'));
 
-const { attention } = data;
 
 function makeRing(data, radius, center) {
   const circlePoints = new Circle(center, radius, 1).points;
@@ -66,19 +134,36 @@ function makeRing(data, radius, center) {
   const minBrainValue = Math.min(...data);
   const maxBrainValue = Math.max(...data);
   const feed = 4000;
-
-  console.log(`F${feed}`);
-  console.log(`G1X${trim(circlePoints[0].x)}Y${trim(circlePoints[0].y)}`);
+  const inkRate = 0.5;
+  const doubleStroke = false;
+  const setupGcode = [laserMode(), G1(circlePoints[0].x, circlePoints[0].y, 0, feed)];
+  let pumping = false;
+  const calcInkState = pumpCheck(inkRate, circlePoints.length);
+  const ring = [];
 
   for (let i = 0; i < circlePoints.length; i++) {
     const { x, y } = circlePoints[i];
     const dataPoint = Math.floor((data.length / circlePoints.length) * i);
     const z = mapRange(data[dataPoint], minBrainValue, maxBrainValue, paperDepth, maxPenDepth);
-    console.log(`G1X${trim(circlePoints[i].x)}Y${trim(circlePoints[i].y)}Z${trim(z)}`);
+    if (calcInkState(i) && !pumping) {
+      ring.push(setFlow(pumpRate));
+      pumping = true;
+    }
+    if (!calcInkState(i) && pumping) {
+      ring.push(setFlow(0));
+      pumping = false;
+    }
+    ring.push(G1(x, y, z));
+    //ring.push(G1(circlePoints[i].x, circlePoints[i].y, z));
+    //ring.push(`G1X${trim(circlePoints[i].x)}Y${trim(circlePoints[i].y)}Z${trim(z)}`);
   }
-  console.log('g0z0');
-  console.log('G1X0Y0');
+  const finalGcode = doubleStroke
+         ? [...setupGcode, ...ring, ...ring].join('\n')
+         : [...setupGcode, ...ring].join('\n');
+  console.log(finalGcode);
 }
 
-makeRing(attention, 36, new Vec2d(40, 40));
+makeRing(aggregated, 36, new Vec2d(40, 40));
+//makeRing(aggregated, 36, new Vec2d(40 + 36 * 2 + 20, 40));
+//footerGcode();
 

@@ -9,5 +9,6 @@ const radians = toxi.math.MathUtils.radians;
 const tLine = toxi.geom.Line2D;
 const Polygon2d = toxi.geom.Polygon2D;
 const Ellipse = toxi.geom.Ellipse;
+const Wave = toxi.math.waves;
 
-module.exports = { Vec2d, simplex, Spline2d, random, radians, tLine, Ellipse, Polygon2d };
+module.exports = { Wave, Vec2d, simplex, Spline2d, random, radians, tLine, Ellipse, Polygon2d };
