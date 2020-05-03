@@ -108,12 +108,23 @@ function pumpCheck(dutyCycle, numMoves) {
   }
 }
 
-const G1 = (x, y, z, f) => `G1X${trim(x)}Y${trim(y)}Z${trim(z)}${f === undefined ? '' : `F${trim(f)}`}`;
+function pumpAndMove(start, dest, duration) {
+  //move for duration in seconds with pump active to prime brush
+  const distance = start.distanceTo(dest);
+  const rate = distance/(duration / 60);
+  return `G1X${dest.x}Y${dest.y}F${trim(rate)}S${1000}`;
+}
+
+function writeGcode(cmds) {
+  console.log(cmds.join('\n'));
+}
+
+const G1 = (x, y, z, f) => `G1X${trim(x)}Y${trim(y)}${z === undefined ? '' : `Z${trim(z)}`}${f === undefined ? '' : `F${trim(f)}`}`;
 const G0 = (x, y, z) => `G0X${x}Y${y}Z${z}`;
 const setFeed = (f) => `F${f}`;
 const setFlow = (f) => `S${f}`;
 const clearPen = () => 'G0Z0';
-const laserMode = () => 'M4'; //Dynamic Laser Power Mode
+const laserMode = () => 'M3'; //User defined Laser Power Mode
 
 const data = brainReading(process.argv[2]);
 const attention = data['attention'];
@@ -123,30 +134,43 @@ const highAlpha = data['high alpha'];
 const lowBeta = data['low beta'];
 const highBeta = data['high beta'];
 const aggregated = aggregateData(lowAlpha, highAlpha, lowBeta, highBeta);
+
 const pumpRate = 1000;
-const footerGcode = () => console.log([setFlow(0), clearPen(), G1(0, 0, 0)].join('\n'));
+const footerGcode = [setFlow(0), clearPen(), G1(0, 0, 0)];
+const radius = 36;
+const primingFeed = 3000;
+const paperDepth = -2;
+const maxPenDepth = -6;
+const feed = 4000;
+const inkRate = 0.05;
+const doubleStroke = false; //use a second stroke with zero ink flow to even out ink distribution?
+//start ink flow during move-to-start to prime pen
+//use pumpAndMove() to fine tune priming duration
+//or slow down initial move to circle start (done here)
+const setupGcode = [laserMode(), setFeed(feed), clearPen()];
 
 
-function makeRing(data, radius, center) {
-  const circlePoints = new Circle(center, radius, 1).points;
-  const paperDepth = -2;
-  const maxPenDepth = -6;
+function makeRing(data, radius, center, flow) {
+  let pumping = false;
   const minBrainValue = Math.min(...data);
   const maxBrainValue = Math.max(...data);
-  const feed = 4000;
-  const inkRate = 0.5;
-  const doubleStroke = false;
-  const setupGcode = [laserMode(), G1(circlePoints[0].x, circlePoints[0].y, 0, feed)];
-  let pumping = false;
+  const circlePoints = new Circle(center, radius, 1).points;
   const calcInkState = pumpCheck(inkRate, circlePoints.length);
   const ring = [];
+ //move to start while priming pump??
+  ring.push(setFlow(pumpRate));
+  ring.push(setFeed(primingFeed));
+  ring.push(G1(circlePoints[0].x, circlePoints[0].y));
+  ring.push(setFlow(0));
+  ring.push(setFeed(feed));
 
+//now draw ring
   for (let i = 0; i < circlePoints.length; i++) {
     const { x, y } = circlePoints[i];
     const dataPoint = Math.floor((data.length / circlePoints.length) * i);
     const z = mapRange(data[dataPoint], minBrainValue, maxBrainValue, paperDepth, maxPenDepth);
     if (calcInkState(i) && !pumping) {
-      ring.push(setFlow(pumpRate));
+      ring.push(setFlow(flow));
       pumping = true;
     }
     if (!calcInkState(i) && pumping) {
@@ -154,16 +178,13 @@ function makeRing(data, radius, center) {
       pumping = false;
     }
     ring.push(G1(x, y, z));
-    //ring.push(G1(circlePoints[i].x, circlePoints[i].y, z));
-    //ring.push(`G1X${trim(circlePoints[i].x)}Y${trim(circlePoints[i].y)}Z${trim(z)}`);
   }
-  const finalGcode = doubleStroke
-         ? [...setupGcode, ...ring, ...ring].join('\n')
-         : [...setupGcode, ...ring].join('\n');
-  console.log(finalGcode);
+  return ring;
 }
-
-makeRing(aggregated, 36, new Vec2d(40, 40));
-//makeRing(aggregated, 36, new Vec2d(40 + 36 * 2 + 20, 40));
-//footerGcode();
+writeGcode([
+  ...setupGcode,
+  ...makeRing(attention, radius, new Vec2d(40, 40), pumpRate),
+  ...makeRing(attention, radius, new Vec2d(40, 40), 0),
+  ...footerGcode
+]);
 
